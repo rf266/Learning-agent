@@ -2,6 +2,9 @@ from dotenv import load_dotenv
 from langchain.tools import tool
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
+from langgraph.checkpoint.memory import InMemorySaver
+from langchain.agents.middleware import SummarizationMiddleware
+
 import sqlite3
 import os
 
@@ -33,18 +36,19 @@ cursor.execute(sql2)
 
 print("DB generated")
 
+
 system_prompt = """You are an expert coding tutor specialised in assisting learners how to develop their Python programming skills.
-You take in and process user prompts and respond accordingly. 
+You take in and process user prompts and respond accordingly. This can include both code and concepts. 
 Your main functionality is testing users on their Python concepts and skills whilst tracking their responses and providing feedback to help them improve. 
 
-When the user starts, either pick a topic to gauge their understanding, or choose based on their prompt. 
+When the user starts, pick a topic for them to gauge their understanding. Only move on to the next topic when all questions pertaining to that topic have been answered.  
 
 You must generate five questions that you will ask the user. 
 
-You are equipped with a connection to database storage, named learn.db. This is done to allow you to track the questions and topics being tested and monitor user performance. 
+You are equipped with a connection to database storage, named 'learn.db'. This is done to allow you to track the questions and topics being tested and monitor user performance. 
 The database contains two tables, TOPICS and QUESTIONS. This is a one to many relationship, where one TOPIC can have many QUESTIONS.
 
-The database will contain all the TOPICS and QUESTIONS that YOU will ask the user. IT will grow over time. YOU must do the necessary SQL additions
+The database will contain all the TOPICS and QUESTIONS that YOU have already asked the user. IT will grow over time. IT will be empty at the start. as the user answers questions, these will be added, as well as the topics. 
 
 Schemas and information: 
 
@@ -63,6 +67,20 @@ The Response is a string, containing all the responses the user had for that par
 The Feedback is a string, containing all feedback from YOU, the LLM in the same fashion as Response. 
 The Attempts is an integer, incrementing everytime the same question is reattempted. 
 
+TYPICAL WORKFLOW:
+- ASK USER WHAT THEY WOULD LIKE TO BE TESTED ON
+- GENERATE 5 QUESTIONS RELATING TO THAT TOPIC
+- ASK THE QUESTION 
+- ANALYSE USER RESPONSE AND PROVIDE FEEDBACK
+- IF THEY ARE WRONG, ASK THEM TO RETRY
+- MAKE THE NECESSARY ADJUSTMENTS IN DATABASE TABLES BASED ON TOOL PERMISSIONS
+- BIG ONE ----->>> DO NOT ASSUME A NEW TOPIC FROM A USER'S RESPONSE TO A QUESTION. JUST PROVIDE FEEDBACK AND STAY WITH THE CURRENT TOPIC
+- REPEAT FOR THE REST OF THE QUESTIONS
+- AFTER ALL 5 QUESTIONS ARE DONE,SUGGEST A NEW TOPIC
+- REPEAT
+
+-EACH TOPIC must only be added once to the TOPICS table, not multiple times. 
+
 You are allowed to perform search queries between both tables to find things like the corresponding TopicID for each question, as well as analysing trends. 
 
 YOU are allowed to add records as stipulated by the tools. 
@@ -75,8 +93,27 @@ INCLUDE ALL REQUIRED FIELDS FOR EACH TOOL
 
 IF YOU FACE ANY ISSUES WITH THE DATABASE OR ANYTHING AT ALL - BE EXTREMELY SPECIFIC IN YOUR RESPONSE
 
-ONLY MOVE ON TO THE NEXT TOPIC WHEN ALL THE QUESTIONS IN THE PREVIOUS HAVE BEEN OVERRIDEN!!
+ONLY MOVE ON TO THE NEXT TOPIC WHEN ALL THE QUESTIONS IN THE PREVIOUS HAVE BEEN OVERRIDEN!! DONT GIVE AWAY ALL THE QUESTIONS AT ONCE
 """
+
+@tool
+def check_topics():
+    """Checks the Topics that have already been asked about before suggesting a new one, which are stored in the TOPICS table.
+    
+    Your job is to ensure that no topics are repeated, and that you don't provide any similar topics.
+    For eg, if 'Python Basics' has already been tested, you must not test anything like 'Python Fundamentals' or the like.
+    
+    The function extracts the Topic column in the TOPICS table and appends it to an array that you must analyse before providing a new topic"""
+    try:
+        connection = sqlite3.connect("learn.db")
+        cursor = connection.cursor()
+        sqlsearch = "select * from TOPICS"
+        topics = []
+        topics.append(cursor.execute(sqlsearch))
+
+        return "Search complete"
+    except Exception as e:
+        return f"Error searching topics: {e}"
 
 
 @tool
@@ -171,7 +208,7 @@ def add_question(topic_id:int, response:str, feedback:str, qset:dict):
     Attempts is set to 1 by default. If the same question is reatttempted, increment this in the cell.
     This helps the LLM understand the user's thought and response pattern, informing how they will perform in future topics. 
 
-    ASK QUESTIONS ONE BY ONE
+    ASK QUESTIONS ONE BY ONE. DONT GIVE AWAY ALL THE QUESTIONS AT ONCE
     """
     try:
         connection = sqlite3.connect("learn.db")
@@ -179,6 +216,9 @@ def add_question(topic_id:int, response:str, feedback:str, qset:dict):
         cursor = connection.cursor()
         question = qset[0][0]
         qset = qset[0][1:]
+        sqltopic = "select TopicID from TOPICS where Topic=(?)"
+        cursor.execute(sqltopic, topic_id)
+        cursor.commit()
         sqlinsert = "insert into QUESTIONS values(?,?,?,?,?,?)"
         cursor.execute(sqlinsert, (None, topic_id, question, response, feedback, 1))
         connection.commit()
@@ -187,16 +227,23 @@ def add_question(topic_id:int, response:str, feedback:str, qset:dict):
     except Exception as e:
         return f"Error adding question: {e}", qset
 
-model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.7)
-tools = [gen_questions, add_question,add_topic ]
-agent = create_agent(model=model, tools=tools, system_prompt=system_prompt)
+model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
+tools = [check_topics, gen_questions, add_question,add_topic ]
+agent = create_agent(model=model, tools=tools, #checkpointer=InMemorySaver(),
+                     middleware=
+                     [SummarizationMiddleware(model=model,trigger=("fraction",0.001),
+                         keep=("fraction",1)
+                     )],
+                     system_prompt=system_prompt)
+
+config = {"configurable": {"thread_id":"test1"}}
 
 try: 
     while True: 
         result = agent.invoke(
-            {"messages": [{"role": "user", "content": input(">>> ") }]}
+            {"messages": [{"role": "user", "content": input(">>> ") }]}#,config=config["configurable"]
         )
-        print(result["messages"][-1].content, flush=True)
+        print(result["messages"][-1].content)
 except Exception as e:
     print("Error ", e)
 
