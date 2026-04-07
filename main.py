@@ -229,11 +229,7 @@ def add_question(topic_id:int, response:str, feedback:str, qset:dict):
 
 model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
 tools = [check_topics, gen_questions, add_question,add_topic ]
-agent = create_agent(model=model, tools=tools, #checkpointer=InMemorySaver(),
-                     middleware=
-                     [SummarizationMiddleware(model=model,trigger=("fraction",0.001),
-                         keep=("fraction",1)
-                     )],
+agent = create_agent(model=model, tools=tools,
                      system_prompt=system_prompt)
 
 config = {"configurable": {"thread_id":"test1"}}
@@ -241,9 +237,10 @@ config = {"configurable": {"thread_id":"test1"}}
 try: 
     while True: 
         result = agent.invoke(
-            {"messages": [{"role": "user", "content": input(">>> ") }]}#,config=config["configurable"]
+            {"messages": [{"role": "user", "content": input(">>> ") }]}
         )
         print(result["messages"][-1].content)
 except Exception as e:
     print("Error ", e)
+
 
