@@ -109,7 +109,7 @@ def check_topics():
         cursor = connection.cursor()
         sqlsearch = "select * from TOPICS"
         topics = []
-        topics.append(cursor.execute(sqlsearch))
+        topics.append(cursor.fetchall(sqlsearch))
 
         return "Search complete"
     except Exception as e:
