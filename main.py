@@ -2,8 +2,7 @@ from dotenv import load_dotenv
 from langchain.tools import tool
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
-from langgraph.checkpoint.memory import InMemorySaver
-from langchain.agents.middleware import SummarizationMiddleware
+
 
 import sqlite3
 import os
@@ -231,8 +230,6 @@ model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct",
 tools = [check_topics, gen_questions, add_question,add_topic ]
 agent = create_agent(model=model, tools=tools,
                      system_prompt=system_prompt)
-
-config = {"configurable": {"thread_id":"test1"}}
 
 try: 
     while True: 
