@@ -2,6 +2,8 @@
 
 This agent is an AI-powered coding tutor. It is designed to help users strengthen their conceptual and code understanding of Python by asking questions targetting specific topics. 
 
+Currently, I am working through state preservation challenges, and developing efficient system design to allow the LLM to have an approporiate level of control over the process. 
+
 ## Tech Stack
 - Langchain agent orchestration
 - SQLite database storage
@@ -31,12 +33,6 @@ QUESTIONS(QID, TopicID, Question, Response, Feedback, Attempts)
 
 A one to many relationship is demonstrated - one topic can have many questions, but one question can have one topic, for now. 
 
-TOPICS Table:
-This table stores information abotu the 
-
-
-
-- State Preservation
 
 
 ## Sources - non exhaustive 
