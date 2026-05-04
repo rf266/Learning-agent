@@ -2,7 +2,7 @@
 
 This agent is an AI-powered coding tutor. It is designed to help users strengthen their conceptual and code understanding of Python by asking questions targetting specific topics. 
 
-Currently, I am working through state preservation challenges, and developing efficient system design to allow the LLM to have an approporiate level of control over the process. 
+**This project is a work in progress**. Currently, I am working through state preservation challenges, and developing efficient system design to allow the LLM to have an approporiate level of control over the process. 
 
 ## Tech Stack
 - Langchain agent orchestration
