@@ -79,6 +79,10 @@ https://www.arsturn.com/blog/langchain-llm-returning-empty-results-common-fixes 
 
 https://www.youtube.com/watch?v=vzJOAnwIokM - Langchain overview
 
+https://medium.com/data-and-beyond/output-parsers-in-langchain-b2e0db20880f -  output parsers
+
+https://www.youtube.com/watch?v=v9G-h6Ygokk - LCEL operator
+
 #### Stack overflow questions I posted
 
 - https://stackoverflow.com/questions/79907528/why-does-groq-langchain-model-return-tool-use-failed-error/79907609#79907609

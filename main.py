@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from langchain.tools import tool
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
-
+import json
 
 import sqlite3
 import os
@@ -214,7 +214,7 @@ def add_question(topic_id:int, response:str, feedback:str, qset:dict):
 
         cursor = connection.cursor()
         question = qset[0][0]
-        qset = qset[0][1:]
+        #qset = qset[0][1:]
         sqltopic = "select TopicID from TOPICS where Topic=(?)"
         cursor.execute(sqltopic, topic_id)
         cursor.commit()
@@ -228,13 +228,21 @@ def add_question(topic_id:int, response:str, feedback:str, qset:dict):
 
 model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
 tools = [check_topics, gen_questions, add_question,add_topic ]
-agent = create_agent(model=model, tools=tools,
-                     system_prompt=system_prompt)
+agent = create_agent(model=model, tools=tools, system_prompt=system_prompt)
+
+agent_state = {
+    "topic": "Insert topic",
+    "question_list": [], 
+    "count_topic_question": 1,
+    "num_attempts" :0,
+    "correct": 0,
+    "strength": "insert strength"
+}
 
 try: 
     while True: 
         result = agent.invoke(
-            {"messages": [{"role": "user", "content": input(">>> ") }]}
+            {"messages": [{"role": "user", "content": input(">>> ") + json.dumps(agent_state)}]} #append state 
         )
         print(result["messages"][-1].content)
 except Exception as e:
