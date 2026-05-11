@@ -12,18 +12,18 @@ import os
 load_dotenv() 
 api = os.getenv("GROQ_API_KEY")
 
-strengths = ["Strong", "Intermediate", "Weak"]
 questlist = []
-happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "Discussion"]
-
+responses_to_current = []
+happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "End of Question" ,"Discussion"]
+feed = []
 agent_state = {
     "topic": None,
     "question_list": questlist, 
     "count_topic_question": 0,
     "num_attempts" :0,
     "correct": 0,
-    "strength": None,
-    "current_response": None,
+    "feedback": feed,
+    "responses_to_current_q": responses_to_current,
     "Now": "Accepting Topic"
 }
 
@@ -86,10 +86,10 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
     Returns: 
         JSON output with one field, "Topic" 
     """
-    firstin = input(">>> ")
+    firstin = input( "Choose a topic: ")
     prompt = PromptTemplate(
          template="""
-         You are a helpful python tutor. Right now you need to understand what topic the user wants to be tested on.
+        You are a helpful python tutor. Right now you need to understand what topic the user wants to be tested on.
         The user has entered this: \n {firstin} \n
         Generate the name of the topic to be tested in the specified schema. 
         If it is unclear then suggest your own topic, which must be python related. If there is a clear topic then just follow what the user meant. \n
@@ -100,7 +100,7 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
         partial_variables={"format_instructions": pydparsertopic.get_format_instructions()}
 
     )
-    if agent_state["Now"]=="Accepting Topic":
+    if (agent_state["Now"]=="Accepting Topic") and ( agent_state["count_topic_question"]==0):
         chain = prompt | model | pydparsertopic
         output = chain.invoke({"firstin": firstin})
         print(output)
@@ -139,14 +139,15 @@ def generate_question(agent_state=agent_state, model = model, pydparserquest = p
         input_variables=["topic_now", "prevq"],
         partial_variables={"format_instructions": pydparserquest.get_format_instructions()}
 
-    )
-    if agent_state["Now"]=="Pose Question":
+    ) 
+    if agent_state["Now"]=="Pose Question" and len(agent_state["question_list"])<5:
         chain = prompt | model | pydparserquest
         output = chain.invoke({"topic_now": topic_now, "prevq":prevq})
         print(output)
         question = output.question
         agent_state["question_list"].append(question)
         agent_state["Now"]="Waiting for Response"
+        agent_state["count_topic_question"] =  agent_state["count_topic_question"] +1
         return question, agent_state
 
 
@@ -155,30 +156,50 @@ def get_ans(agent_state=agent_state):
      if agent_state["Now"] == "Waiting for Response":
           response = input("Enter your answer: ")
           agent_state["Now"] = 'Providing Feedback'
-          agent_state["current_response"] = response
+          agent_state["responses_to_current_q"].append(response)
+          agent_state["num_attempts"] = agent_state["num_attempts"] +1
           return response
 
 def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparserfeed):
     nowquestion=agent_state["question_list"][-1]
-    nowresponse = agent_state["current_response"]
+    nowresponse = agent_state["responses_to_current_q"][-1]
+    pastresponses = agent_state["responses_to_current_q"][:-1]
+    num_attempts = agent_state["num_attempts"]
     if agent_state["Now"] == 'Providing Feedback':
         prompt = PromptTemplate(
                template = """
                 As part of being a helpful Python tutor, you have to provide feedback to the user's response of a particular python question. Take the following into account strictly:
                 \n This is the Question: {nowquestion} \n
                 This is the response the user gave: {nowresponse} \n
+                These are the past responses to the same question, if you would like to touch on prior mistakes {pastresponses} \n
+                This is the number of attempts used in this question {num_attempts} \n
                 Format instructions: {format_instructions} \n
-                You must force JSON output only, NOTHING ELSE.
-                Feedback must be concise. If incorrect, provide hints to get them to the right answer. 
+                You must force JSON output only, NOTHING ELSE. 
+                Feedback must be concise. Don't give away the right answer, unless the number of attempts has increased too much. 
                 """,
 
-                input_variables=["nowquestion", "nowresponse"],
+                input_variables=["nowquestion", "nowresponse","pastresponses","num_attempts"],
                 partial_variables = {"format_instructions": pydparserfeed.get_format_instructions()}
             )
         
         chain = prompt | model | pydparserfeed
-        output = chain.invoke({"nowquestion":nowquestion,"nowresponse":nowresponse} )
+        output = chain.invoke({"nowquestion":nowquestion,"nowresponse":nowresponse, "pastresponses":pastresponses, "num_attempts":num_attempts} )
         print(output)
+        agent_state["correct"] = output.correct
+        agent_state["feedback"].append(output.feedback)
+        if agent_state["correct"]==1:
+            agent_state["topic"]= None
+            questlist = []
+            agent_state["count_topic_question"]= 0
+            agent_state["num_attempts"] =0
+            agent_state ["correct"]= 0
+            feed = []
+            responses_to_current =[]
+            agent_state["Now "] = "End of Question"
+        
+
+
+             
           
     
 
