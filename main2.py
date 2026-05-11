@@ -14,7 +14,7 @@ api = os.getenv("GROQ_API_KEY")
 
 strengths = ["Strong", "Intermediate", "Weak"]
 questlist = []
-happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "Providing Clarification"]
+happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "Discussion"]
 
 agent_state = {
     "topic": None,
@@ -23,6 +23,7 @@ agent_state = {
     "num_attempts" :0,
     "correct": 0,
     "strength": None,
+    "current_response": None,
     "Now": "Accepting Topic"
 }
 
@@ -64,9 +65,14 @@ class Topic_structure(BaseModel):
 class Question_structure(BaseModel):
         question: str = Field(description="Programming question extracted from predecided topic")
 
+class Feedback_structure(BaseModel):
+        feedback: str = Field(description="Feedback from user response")
+        correct: int = Field(description="Determines whether the user response is correct (1) or incorrect (0)")
+
 
 pydparsertopic = PydanticOutputParser(pydantic_object=Topic_structure)
 pydparserquest = PydanticOutputParser(pydantic_object=Question_structure)
+pydparserfeed = PydanticOutputParser(pydantic_object=Feedback_structure)
 
 def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic): 
     """
@@ -139,11 +145,44 @@ def generate_question(agent_state=agent_state, model = model, pydparserquest = p
         output = chain.invoke({"topic_now": topic_now, "prevq":prevq})
         print(output)
         question = output.question
-        agent_state["question_list"] = agent_state["question_list"].append(question)
+        agent_state["question_list"].append(question)
         agent_state["Now"]="Waiting for Response"
         return question, agent_state
 
+
+
+def get_ans(agent_state=agent_state):
+     if agent_state["Now"] == "Waiting for Response":
+          response = input("Enter your answer: ")
+          agent_state["Now"] = 'Providing Feedback'
+          agent_state["current_response"] = response
+          return response
+
+def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparserfeed):
+    nowquestion=agent_state["question_list"][-1]
+    nowresponse = agent_state["current_response"]
+    if agent_state["Now"] == 'Providing Feedback':
+        prompt = PromptTemplate(
+               template = """
+                As part of being a helpful Python tutor, you have to provide feedback to the user's response of a particular python question. Take the following into account strictly:
+                \n This is the Question: {nowquestion} \n
+                This is the response the user gave: {nowresponse} \n
+                Format instructions: {format_instructions} \n
+                You must force JSON output only, NOTHING ELSE.
+                Feedback must be concise. If incorrect, provide hints to get them to the right answer. 
+                """,
+
+                input_variables=["nowquestion", "nowresponse"],
+                partial_variables = {"format_instructions": pydparserfeed.get_format_instructions()}
+            )
+        
+        chain = prompt | model | pydparserfeed
+        output = chain.invoke({"nowquestion":nowquestion,"nowresponse":nowresponse} )
+        print(output)
+          
+    
+
 generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic)
 generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest)
-
-
+get_ans(agent_state=agent_state)
+mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed)
