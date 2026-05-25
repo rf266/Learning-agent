@@ -48,7 +48,9 @@ sql2 = """create table if not exists QUESTIONS(
     FOREIGN KEY (TopicID) REFERENCES TOPICS(TopicID)
 )"""
 
-if (not os.path.exists("learn.db")) or ((cursor.execute("""SELECT COUNT(*) FROM TOPICS""") or cursor.execute( """SELECT COUNT(*) FROM QUESTIONS""") )==0):
+
+
+if (not os.path.exists("learn.db")) or ((cursor.execute("""SELECT COUNT(*) FROM TOPICS""")) or (cursor.execute( """SELECT COUNT(*) FROM QUESTIONS""") )==0):
  # if the db doesn't exist yet or tables are empty, (re)create it from scratch
     cursor.execute(sql1)
     cursor.execute(sql2)
@@ -58,14 +60,33 @@ else: # otherwise populate the state dictionary with the latest record
 
      cursor.execute(sql_latesttopics)
      out1 = cursor.fetchone()
-     first_topic = out1[1]
-     first_understood = out1[2]
+     first_topic = out1[1] #topic last tested
+     agent_state["topic"] = first_topic
+     first_understood = out1[2] 
+     agent_state["topic_understood"] = first_understood
 
-     sql_quest_lists = f"""SELECT Question FROM QUESTIONS WHERE TopicID = (SELECT TopicID FROM TOPICS WHERE Topic=(?) ORDER BY QID """
+     sql_quest_lists = f"""SELECT Question FROM QUESTIONS WHERE TopicID = (SELECT TopicID FROM TOPICS WHERE Topic=(?) ORDER BY QID )"""
      cursor.execute(sql_quest_lists,(first_topic))
      out2 = cursor.fetchall()
      print(out2)
-     questlist.append(out2)
+     questlist.append(out2) # added the questions previously tested
+
+     agent_state["count_topic_question"] = len(questlist) #number of questions tested
+
+     sql_quest_data = """SELECT * FROM QUESTIONS ORDER BY TopicID DESC LIMIT 1"""
+     cursor.execute(sql_quest_data)
+     out3 = cursor.fetchone()
+     first_resp = out3[3]
+     first_feed = out3[4]
+     first_attempts = out3[5]
+
+     agent_state["num_attempts"] = first_attempts
+     responses_to_current.append(first_resp)
+     feed.append(first_feed)
+
+     print(agent_state)
+
+
 
 print("DB generated")
 
