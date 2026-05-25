@@ -48,47 +48,75 @@ sql2 = """create table if not exists QUESTIONS(
     FOREIGN KEY (TopicID) REFERENCES TOPICS(TopicID)
 )"""
 
+def setup():
+    try:
+        cursor.execute("""SELECT COUNT(*) FROM TOPICS""") 
+    except sqlite3.OperationalError:  #if TOPICS doesn't exist - must mean that the QUESTIONS doesn't exist either - checking if the db exists
+        cursor.execute(sql1)
+        cursor.execute(sql2)     
+    else: #otherwise populate the state dictionary with the latest record if the tables aren't empty
+        cursor.execute("""SELECT COUNT(*) FROM TOPICS""")
+        rowstopic = cursor.fetchall()
+        cursor.execute("""SELECT COUNT(*) FROM QUESTIONS""")
+        rowsquest = cursor.fetchall()
 
+        if (rowstopic>0) and (rowsquest>0): #if both are not empty
 
-if (not os.path.exists("learn.db")) or ((cursor.execute("""SELECT COUNT(*) FROM TOPICS""")) or (cursor.execute( """SELECT COUNT(*) FROM QUESTIONS""") )==0):
- # if the db doesn't exist yet or tables are empty, (re)create it from scratch
-    cursor.execute(sql1)
-    cursor.execute(sql2)
+            sql_latesttopics = """SELECT * FROM TOPICS ORDER BY TopicID DESC LIMIT 1""" # find the latest topic from last record
 
-else: # otherwise populate the state dictionary with the latest record
-     sql_latesttopics = """SELECT * FROM TOPICS ORDER BY TopicID DESC LIMIT 1""" # find the latest topic from last record
+            cursor.execute(sql_latesttopics)
+            out1 = cursor.fetchone()
+            first_topic = out1[1] #topic last tested
+            agent_state["topic"] = first_topic
+            first_understood = out1[2] 
+            agent_state["topic_understood"] = first_understood
 
-     cursor.execute(sql_latesttopics)
-     out1 = cursor.fetchone()
-     first_topic = out1[1] #topic last tested
-     agent_state["topic"] = first_topic
-     first_understood = out1[2] 
-     agent_state["topic_understood"] = first_understood
+            sql_quest_lists = f"""SELECT Question FROM QUESTIONS WHERE TopicID = (SELECT TopicID FROM TOPICS WHERE Topic=(?) ORDER BY QID )"""
+            cursor.execute(sql_quest_lists,(first_topic))
+            out2 = cursor.fetchall()
+            print(out2)
+            questlist.append(out2) # added the questions previously tested
 
-     sql_quest_lists = f"""SELECT Question FROM QUESTIONS WHERE TopicID = (SELECT TopicID FROM TOPICS WHERE Topic=(?) ORDER BY QID )"""
-     cursor.execute(sql_quest_lists,(first_topic))
-     out2 = cursor.fetchall()
-     print(out2)
-     questlist.append(out2) # added the questions previously tested
+            agent_state["count_topic_question"] = len(questlist) #number of questions tested
 
-     agent_state["count_topic_question"] = len(questlist) #number of questions tested
+            sql_quest_data = """SELECT * FROM QUESTIONS ORDER BY TopicID DESC LIMIT 1"""
+            cursor.execute(sql_quest_data)
+            out3 = cursor.fetchone()
+            first_resp = out3[3]
+            first_feed = out3[4]
+            first_attempts = out3[5]
 
-     sql_quest_data = """SELECT * FROM QUESTIONS ORDER BY TopicID DESC LIMIT 1"""
-     cursor.execute(sql_quest_data)
-     out3 = cursor.fetchone()
-     first_resp = out3[3]
-     first_feed = out3[4]
-     first_attempts = out3[5]
+            agent_state["num_attempts"] = first_attempts
+            responses_to_current.append(first_resp)
+            feed.append(first_feed)
 
-     agent_state["num_attempts"] = first_attempts
-     responses_to_current.append(first_resp)
-     feed.append(first_feed)
+            if agent_state["count_topic_question"] ==5: #case where we are at the end of the current topic, reset state dict
+                agent_state["Now"] = "Accepting Topic"
+                agent_state["topic"]= None
+                questlist = []
+                agent_state["count_topic_question"]= 0
+                agent_state["num_attempts"] =0
+                agent_state ["correct"]= 0
+                feed = []
+                responses_to_current =[]
 
-     print(agent_state)
+            
+            
 
+        elif (rowstopic>0) and (rowsquest==0): #case where a topic is established but no questions asked yet
+            sql_latesttopics = """SELECT * FROM TOPICS ORDER BY TopicID DESC LIMIT 1""" # find the latest topic from last record
 
+            cursor.execute(sql_latesttopics)
+            out1 = cursor.fetchone()
+            first_topic = out1[1] #topic last tested
+            agent_state["topic"] = first_topic
+            first_understood = out1[2] 
+            agent_state["topic_understood"] = first_understood
+            agent_state["Now"] = "Pose Question"
 
-print("DB generated")
+        print(agent_state)
+
+    print("DB generated")
 
 system_prompt = "You are a helpful Python Programming tutor. " \
 "You will generate questions as called by functions to test the user on their desired concepts. " \
@@ -228,8 +256,8 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
         
         if agent_state["num_attempts"] == 1: #if its the first time the question has beeen posed
             questinsert = """INSERT INTO QUESTIONS (?,?,?,?,?,?)"""
-            topicinsert = """INSERT INTO TOPIC (?,?,?)"""
-            find_topid_id = """SELECT TopicID FROM TOPIC WHERE Topic = (?)"""
+            topicinsert = """INSERT INTO TOPICS (?,?,?)"""
+            find_topid_id = """SELECT TopicID FROM TOPICS WHERE Topic = (?)"""
             cursor.execute(find_topid_id, agent_state["topic"])
             topicid = (cursor.fetchall())[0]
             cursor.execute(topicinsert,(None, agent_state["topic"],0))
@@ -241,11 +269,11 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
 
         if agent_state["correct"]==1:
             agent_state["Now "] = "End of Question"
-             # reset for the next q 
+             #reset for the next q 
             feed = []
             responses_to_current =[]
            
-            if agent_state["count_topic_question"] == 5: # if we have finished with the topic, reset the state 
+            if agent_state["count_topic_question"] == 5: #if we have finished with the topic, reset the state 
                 update_understood = """UPDATE TOPICS SET Undersood = 1"""
                 cursor.execute(update_understood)
                 agent_state["topic"]= None
@@ -258,8 +286,8 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
                 agent_state["Now "] = "End of Question"
 
             
-                
-    generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic)
-    generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest)
-    get_ans(agent_state=agent_state)
-    mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed)
+setup()        
+generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic)
+generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest)
+get_ans(agent_state=agent_state)
+mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed)
