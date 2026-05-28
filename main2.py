@@ -56,11 +56,11 @@ def setup():
         cursor.execute(sql2)     
     else: #otherwise populate the state dictionary with the latest record if the tables aren't empty
         cursor.execute("""SELECT COUNT(*) FROM TOPICS""")
-        rowstopic = cursor.fetchall()
+        rowstopic = cursor.fetchone()
         cursor.execute("""SELECT COUNT(*) FROM QUESTIONS""")
-        rowsquest = cursor.fetchall()
-
-        if (rowstopic>0) and (rowsquest>0): #if both are not empty
+        rowsquest = cursor.fetchone()
+ 
+        if (rowstopic[0]>0) and (rowsquest[0]>0): #if both are not empty
 
             sql_latesttopics = """SELECT * FROM TOPICS ORDER BY TopicID DESC LIMIT 1""" # find the latest topic from last record
 
@@ -98,12 +98,9 @@ def setup():
                 agent_state["num_attempts"] =0
                 agent_state ["correct"]= 0
                 feed = []
-                responses_to_current =[]
+                responses_to_current =[]       
 
-            
-            
-
-        elif (rowstopic>0) and (rowsquest==0): #case where a topic is established but no questions asked yet
+        elif (rowstopic[0]>0) and (rowsquest[0]==0): #case where a topic is established but no questions asked yet
             sql_latesttopics = """SELECT * FROM TOPICS ORDER BY TopicID DESC LIMIT 1""" # find the latest topic from last record
 
             cursor.execute(sql_latesttopics)
@@ -113,8 +110,6 @@ def setup():
             first_understood = out1[2] 
             agent_state["topic_understood"] = first_understood
             agent_state["Now"] = "Pose Question"
-
-        print(agent_state)
 
     print("DB generated")
 
@@ -174,6 +169,9 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
         agent_state["Topic"] = topic
         agent_state["Now"]="Pose Question"
         print(agent_state["Now"])
+
+        topicinsert = """INSERT INTO TOPICS (TopicID, Topic, Understood) VALUES (?,?,?)"""
+        cursor.execute(topicinsert, (None, topic, 0))
         return topic, agent_state
         
 
@@ -255,12 +253,11 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
         agent_state["feedback"].append(output.feedback)
         
         if agent_state["num_attempts"] == 1: #if its the first time the question has beeen posed
-            questinsert = """INSERT INTO QUESTIONS (?,?,?,?,?,?)"""
-            topicinsert = """INSERT INTO TOPICS (?,?,?)"""
+            questinsert = """INSERT INTO QUESTIONS (QID, TopicID, Question, Response, Feedback, Attempts) VALUES (?,?,?,?,?,?)"""
             find_topid_id = """SELECT TopicID FROM TOPICS WHERE Topic = (?)"""
             cursor.execute(find_topid_id, agent_state["topic"])
             topicid = (cursor.fetchall())[0]
-            cursor.execute(topicinsert,(None, agent_state["topic"],0))
+            #cursor.execute(topicinsert,(None, agent_state["topic"],0))
             cursor.execute(questinsert,(None, topicid,nowquestion,agent_state["responses_to_current_q"],feed,num_attempts))
 
         else: #update the response and feedback record
@@ -268,13 +265,13 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
             cursor.execute(update_feed_ans, (responses_to_current, feed, agent_state["num_attempts"]))
 
         if agent_state["correct"]==1:
-            agent_state["Now "] = "End of Question"
+            agent_state["Now"] = "End of Question"
              #reset for the next q 
             feed = []
             responses_to_current =[]
            
             if agent_state["count_topic_question"] == 5: #if we have finished with the topic, reset the state 
-                update_understood = """UPDATE TOPICS SET Undersood = 1"""
+                update_understood = """UPDATE TOPICS SET Understood = 1"""
                 cursor.execute(update_understood)
                 agent_state["topic"]= None
                 questlist = []
@@ -283,11 +280,15 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
                 agent_state ["correct"]= 0
                 feed = []
                 responses_to_current =[]
-                agent_state["Now "] = "End of Question"
+                agent_state["Now"] = "End of Question"
 
             
-setup()        
+setup()
+print("\n ===Check 1 of agent state ", agent_state, "===")        
 generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic)
+print("\n===Check 2 of agent state ", agent_state, "===")   
 generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest)
+print("\n===Check 3 of agent state ", agent_state, "===")   
 get_ans(agent_state=agent_state)
+print("\n===Check 4 of agent state ", agent_state, "===")   
 mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed)
