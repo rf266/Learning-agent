@@ -1,11 +1,8 @@
 from dotenv import load_dotenv
-from langchain.tools import tool
-from langchain.agents import create_agent
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
-import json
 import sqlite3
 import os
 
@@ -45,6 +42,7 @@ sql2 = """create table if not exists QUESTIONS(
     Response text,
     Feedback text,
     Attempts integer, 
+    Correct integer,
     FOREIGN KEY (TopicID) REFERENCES TOPICS(TopicID)
 )"""
 
@@ -52,48 +50,53 @@ def setup():
     try:
         cursor.execute("""SELECT COUNT(*) FROM TOPICS""") 
     except sqlite3.OperationalError:  #if TOPICS doesn't exist - must mean that the QUESTIONS doesn't exist either - checking if the db exists
+        agent_state["Now"] = "Accepting Topic"
         cursor.execute(sql1)
         cursor.execute(sql2)     
         print("DB generated")
-        connection.commit()
-    else: #otherwise populate the state dictionary with the latest record if the tables aren't empty
+        
+        connection.commit() #create the db from scratch
+    else: #otherwise populate the state dictionary with the latest record if the tables aren't empty based on cases
         cursor.execute("""SELECT COUNT(*) FROM TOPICS""")
         rowstopic = cursor.fetchone()
         cursor.execute("""SELECT COUNT(*) FROM QUESTIONS""")
         rowsquest = cursor.fetchone()
+        print(rowsquest,rowstopic) #get number of rows in each table if the db exists
  
-        if (rowstopic[0]>0) and (rowsquest[0]>0): #if both are not empty
+        if (rowstopic[0]>0) and (rowsquest[0]>0): #if both are not empty, meaning a question has already been asked from a topic 
 
             sql_latesttopics = """SELECT * FROM TOPICS ORDER BY TopicID DESC LIMIT 1""" # find the latest topic from last record
 
             cursor.execute(sql_latesttopics)
-            out1 = cursor.fetchone()
+            out1 = cursor.fetchone() #get the topic
             first_topic = out1[1] #topic last tested
-            agent_state["topic"] = first_topic
+            agent_state["topic"] = first_topic #update state dict
             first_understood = out1[2] 
-            agent_state["topic_understood"] = first_understood
+            agent_state["topic_understood"] = first_understood# update state dict
 
-            sql_quest_lists = f"""SELECT Question FROM QUESTIONS WHERE TopicID = (SELECT TopicID FROM TOPICS WHERE Topic=(?) )  ORDER BY QID"""
+            sql_quest_lists = f"""SELECT Question FROM QUESTIONS WHERE TopicID = (SELECT TopicID FROM TOPICS WHERE Topic=(?) )  ORDER BY QID""" #get the questions for this topic
             cursor.execute(sql_quest_lists,(first_topic,))
             out2 = cursor.fetchall()
             print(out2)
             for item in out2:
-                questlist.append(item[0]) # added the questions previously tested
+                questlist.append(item[0]) # added the questions previously tested to the state
 
-            agent_state["count_topic_question"] = len(questlist) #number of questions tested
+            agent_state["count_topic_question"] = len(questlist) #number of questions tested added to state
 
-            sql_quest_data = """SELECT * FROM QUESTIONS ORDER BY TopicID DESC LIMIT 1"""
+            sql_quest_data = """SELECT * FROM QUESTIONS ORDER BY TopicID DESC LIMIT 1""" #get the last record in QUESTIONS
             cursor.execute(sql_quest_data)
-            out3 = cursor.fetchone()
+            out3 = cursor.fetchone() #get the tuple of data
             first_resp = out3[3]
             first_feed = out3[4]
             first_attempts = out3[5]
+            first_correct = out3[6] #collect all fields
 
             agent_state["num_attempts"] = first_attempts
             responses_to_current.append(first_resp)
             feed.append(first_feed)
+            agent_state["Now"] = "Accepting Topic"
 
-            if agent_state["count_topic_question"] ==5: #case where we are at the end of the current topic, reset state dict
+            if agent_state["count_topic_question"] ==5 and first_correct==1: #case where we are at the end of the current topic, reset state dict
                 agent_state["Now"] = "Accepting Topic"
                 agent_state["topic"]= None
                 agent_state["question_list"].clear()
@@ -101,7 +104,11 @@ def setup():
                 agent_state["num_attempts"] =0
                 agent_state ["correct"]= 0
                 agent_state["feedback"].clear()
-                agent_state["responses_to_current_q"].clear()       
+                agent_state["responses_to_current_q"].clear()    
+                agent_state["correct"] = 0  
+
+            if first_correct == 0: 
+                agent_state["Now"] = "Waiting for Response" #awaiting another response
 
         elif (rowstopic[0]>0) and (rowsquest[0]==0): #case where a topic is established but no questions asked yet
             sql_latesttopics = """SELECT * FROM TOPICS ORDER BY TopicID DESC LIMIT 1""" # find the latest topic from last record
@@ -158,7 +165,7 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
         partial_variables={"format_instructions": pydparsertopic.get_format_instructions()}
 
     )
-    if (agent_state["Now"]=="Accepting Topic" or agent_state["Now"]=="End of Topic" ) and ( agent_state["count_topic_question"]==0):
+    if (agent_state["Now"]=="Accepting Topic" or agent_state["Now"]=="End of Topic" ) and ( agent_state["count_topic_question"]==0 or agent_state["count_topic_question"]==5 ):
         chain = prompt | model | pydparsertopic
         output = chain.invoke({"firstin": firstin})
         print(output)
@@ -256,13 +263,13 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
         topicid = topicid[0]
 
         if agent_state["num_attempts"] == 1: #if its the first time the question has beeen posed
-            questinsert = """INSERT INTO QUESTIONS (QID, TopicID, Question, Response, Feedback, Attempts) VALUES (?,?,?,?,?,?)"""
+            questinsert = """INSERT INTO QUESTIONS (QID, TopicID, Question, Response, Feedback, Attempts, Correct) VALUES (?,?,?,?,?,?,?)"""
             #cursor.execute(topicinsert,(None, agent_state["topic"],0))
-            cursor.execute(questinsert,(None, topicid,nowquestion,str(agent_state["responses_to_current_q"]),str(feed),num_attempts))
+            cursor.execute(questinsert,(None, topicid,nowquestion,str(agent_state["responses_to_current_q"]),str(feed),num_attempts,agent_state["correct"] ))
             connection.commit()
         else: #update the response and feedback record
-            update_feed_ans = """UPDATE QUESTIONS SET Response = (?), Feedback = (?), Attempts = (?) WHERE Question=(?)"""
-            cursor.execute(update_feed_ans, (str(responses_to_current), str(feed), agent_state["num_attempts"], nowquestion))
+            update_feed_ans = """UPDATE QUESTIONS SET Response = (?), Feedback = (?), Attempts = (?), Correct = (?) WHERE Question=(?)"""
+            cursor.execute(update_feed_ans, (str(responses_to_current), str(feed), agent_state["num_attempts"],agent_state["correct"] , nowquestion))
             connection.commit()
 
         if agent_state["correct"]==1:
@@ -270,8 +277,7 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
              #reset for the next q 
             agent_state["feedback"].clear()
             agent_state["responses_to_current_q"].clear()
-            agent_state["num_attempts"] = 0
-           
+
             if agent_state["count_topic_question"] == 5: #if we have finished with the topic, reset the state 
                 update_understood = """UPDATE TOPICS SET Understood = 1 WHERE TopicID=(?)"""
                 cursor.execute(update_understood, (topicid,))
@@ -287,6 +293,9 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
 
             else:
                 agent_state["Now"] = "End of Question"
+
+        else:
+            agent_state["Now"] = "Waiting for Response" #awaiting another response
 
                         
 setup()
