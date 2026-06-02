@@ -82,10 +82,10 @@ def setup():
                 agent_state["Now"] = "Pose Question"
             else:
                 for item in out2:
-                    agent_state["question_list"].append(item[0]) # added the questions previously tested to the state
+                    agent_state["question_list"].append(item[0]) #added the questions previously tested to the state
 
                 agent_state["count_topic_question"] = len(agent_state["question_list"]) #number of questions tested added to state
-                sql_quest_data = """SELECT * FROM QUESTIONS DESC LIMIT 1""" #get the last record in QUESTIONS
+                sql_quest_data = """SELECT * FROM QUESTIONS ORDER BY QID DESC LIMIT 1""" #get the last record in QUESTIONS
                 cursor.execute(sql_quest_data)
                 out3 = cursor.fetchone() #get the tuple of data
                 first_resp = out3[3]
@@ -164,21 +164,28 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
     """
     if (agent_state["Now"]=="Accepting Topic" or agent_state["Now"]=="End of Topic" ) and ( agent_state["count_topic_question"]==0 or agent_state["count_topic_question"]==5 ):
         firstin = input( "Choose a topic: ")
+        all_topics_sql = """SELECT Topic FROM TOPICS ORDER BY TopicID"""
+        cursor.execute(all_topics_sql)
+        list_topics = cursor.fetchall()
+        listed = []
+        for item in list_topics:
+            listed.append(item[0])
         prompt = PromptTemplate(
             template="""
             You are a helpful python tutor. Right now you need to understand what topic the user wants to be tested on.
             The user has entered this: \n {firstin} \n
             Generate the name of the topic to be tested in the specified schema. 
             If it is unclear then suggest your own topic, which must be python related. If there is a clear topic then just follow what the user meant. \n
+            Here are the previously tested topics: \n {listed} \n Do not repeat topics \n
             Format instructions: {format_instructions}
             You must force JSON output only, NOTHING ELSE
             """,
-            input_variables=["firstin"],
+            input_variables=["firstin","listed"],
             partial_variables={"format_instructions": pydparsertopic.get_format_instructions()}
 
         )
         chain = prompt | model | pydparsertopic
-        output = chain.invoke({"firstin": firstin})
+        output = chain.invoke({"firstin": firstin, "listed":listed})
         print(output)
         topic = output.topic
         agent_state["topic"] = topic #set the state to how it's needed
@@ -260,7 +267,9 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
                 This is the number of attempts used in this question {num_attempts} \n
                 Format instructions: {format_instructions} \n
                 You must force JSON output only, NOTHING ELSE. 
-                Feedback must be concise. Don't give away the right answer, unless the number of attempts has increased too much. 
+                Feedback must be concise. Don't give away the right answer, unless the number of attempts has increased too much and they show no understanding of the concept. \n
+                Do not penalise arbritary issues with how they responded - conceptual understanding is the main goal. They may respond with half sentences so you must build a concept of their understanding from previous responses. \n
+                Unless the question asks, no need for syntax.
                 """,
 
                 input_variables=["nowquestion", "nowresponse","pastresponses","num_attempts"],
@@ -282,10 +291,12 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
             questinsert = """INSERT INTO QUESTIONS (QID, TopicID, Question, Response, Feedback, Attempts, Correct) VALUES (?,?,?,?,?,?,?)"""
             cursor.execute(questinsert,(None, topicid,nowquestion,str(agent_state["responses_to_current_q"]),str(agent_state["feedback"]),num_attempts,agent_state["correct"] ))
             connection.commit()
+            print("Question added to db")
         else: #update the response and feedback record since it must already be there
             update_feed_ans = """UPDATE QUESTIONS SET Response = (?), Feedback = (?), Attempts = (?), Correct = (?) WHERE Question=(?)"""
             cursor.execute(update_feed_ans, (str(agent_state["responses_to_current_q"]), str(agent_state["feedback"]), agent_state["num_attempts"],agent_state["correct"] , nowquestion))
             connection.commit()
+            print("updated attempt in db")
 
         #if the ans is correct
         if agent_state["correct"]==1:
