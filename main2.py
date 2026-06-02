@@ -9,19 +9,17 @@ import os
 load_dotenv() 
 api = os.getenv("GROQ_API_KEY")
 
-questlist = []
-responses_to_current = []
-happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "End of Question" ,"End of Topic"]
-feed = []
+#happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "End of Question" ,"End of Topic"]
+
 agent_state = {
     "topic": None,
     "topic_understood": 0,
-    "question_list": questlist, 
+    "question_list": [], 
     "count_topic_question": 0,
     "num_attempts" :0,
     "correct": 0,
-    "feedback": feed,
-    "responses_to_current_q": responses_to_current,
+    "feedback": [],
+    "responses_to_current_q": [],
     "Now": "Accepting Topic"
 }
 
@@ -84,9 +82,9 @@ def setup():
                 agent_state["Now"] = "Pose Question"
             else:
                 for item in out2:
-                    questlist.append(item[0]) # added the questions previously tested to the state
+                    agent_state["question_list"].append(item[0]) # added the questions previously tested to the state
 
-                agent_state["count_topic_question"] = len(questlist) #number of questions tested added to state
+                agent_state["count_topic_question"] = len(agent_state["question_list"]) #number of questions tested added to state
                 sql_quest_data = """SELECT * FROM QUESTIONS DESC LIMIT 1""" #get the last record in QUESTIONS
                 cursor.execute(sql_quest_data)
                 out3 = cursor.fetchone() #get the tuple of data
@@ -96,8 +94,8 @@ def setup():
                 first_correct = out3[6] #collect all fields
 
                 agent_state["num_attempts"] = first_attempts
-                responses_to_current.append(first_resp)
-                feed.append(first_feed)
+                agent_state["responses_to_current_q"].append(first_resp)
+                agent_state["feedback"].append(first_feed)
             
             if agent_state["count_topic_question"] ==5 and first_correct==1: #case where we are at the end of the current topic, where all five questions were posed and the last one is correct (cannot proceed without attempting correctly) reset state dict
                 agent_state["Now"] = "Accepting Topic" #we can accept a new topic
@@ -119,7 +117,7 @@ def setup():
                 agent_state["correct"] = 0
 
             elif first_correct == 0: #the previous q was not answered correctly, regardless of the number of questions in the topic
-                print("You tried the previous question ", questlist[-1], " and you were not correct. Try again")
+                print("You tried the previous question ", agent_state["question_list"][-1], " and you were not correct. Try again")
                 agent_state["Now"] = "Waiting for Response" #awaiting another response
 
         elif (rowstopic[0]>0) and (rowsquest[0]==0): #case where a topic is established but no questions asked yet
@@ -183,9 +181,13 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
         output = chain.invoke({"firstin": firstin})
         print(output)
         topic = output.topic
-        agent_state["topic"] = topic
+        agent_state["topic"] = topic #set the state to how it's needed
         agent_state["Now"]="Pose Question"
-        print(agent_state["Now"])
+        agent_state["question_list"].clear()
+        agent_state["count_topic_question"] = 0
+        agent_state["correct"] = 0
+        agent_state["feedback"].clear()
+        agent_state["responses_to_current_q"].clear()
 
         topicinsert = """INSERT INTO TOPICS (TopicID, Topic, Understood) VALUES (?,?,?)"""
         cursor.execute(topicinsert, (None, topic, 0))
@@ -275,21 +277,24 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
         topicid = cursor.fetchone()
         topicid = topicid[0]
 
+        #conditions for adding the question record to db or updating it 
         if agent_state["num_attempts"] == 1: #if its the first time the question has beeen posed
             questinsert = """INSERT INTO QUESTIONS (QID, TopicID, Question, Response, Feedback, Attempts, Correct) VALUES (?,?,?,?,?,?,?)"""
-            #cursor.execute(topicinsert,(None, agent_state["topic"],0))
-            cursor.execute(questinsert,(None, topicid,nowquestion,str(agent_state["responses_to_current_q"]),str(feed),num_attempts,agent_state["correct"] ))
+            cursor.execute(questinsert,(None, topicid,nowquestion,str(agent_state["responses_to_current_q"]),str(agent_state["feedback"]),num_attempts,agent_state["correct"] ))
             connection.commit()
-        else: #update the response and feedback record
+        else: #update the response and feedback record since it must already be there
             update_feed_ans = """UPDATE QUESTIONS SET Response = (?), Feedback = (?), Attempts = (?), Correct = (?) WHERE Question=(?)"""
-            cursor.execute(update_feed_ans, (str(responses_to_current), str(feed), agent_state["num_attempts"],agent_state["correct"] , nowquestion))
+            cursor.execute(update_feed_ans, (str(agent_state["responses_to_current_q"]), str(agent_state["feedback"]), agent_state["num_attempts"],agent_state["correct"] , nowquestion))
             connection.commit()
 
+        #if the ans is correct
         if agent_state["correct"]==1:
             agent_state["Now"] = "End of Question"
              #reset for the next q 
             agent_state["feedback"].clear()
             agent_state["responses_to_current_q"].clear()
+            agent_state["num_attempts"] = 0
+            agent_state["correct"]=0
 
             if agent_state["count_topic_question"] == 5: #if we have finished with the topic, reset the state 
                 update_understood = """UPDATE TOPICS SET Understood = 1 WHERE TopicID=(?)"""
