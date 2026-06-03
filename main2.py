@@ -80,6 +80,7 @@ def setup():
 
             if not out2: #if what was returned is empty, meaning no questions yet from this particular topic
                 agent_state["Now"] = "Pose Question"
+                print("no questions found, starting from Q1")
             else:
                 for item in out2:
                     agent_state["question_list"].append(item[0]) #added the questions previously tested to the state
@@ -133,7 +134,7 @@ def setup():
     return agent_state
 
     
-model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3)
+model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3, streaming=True)
 
 class Topic_structure(BaseModel):
         topic: str = Field(description="Programming topic extracted from user input")

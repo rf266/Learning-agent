@@ -7,7 +7,7 @@ This agent is an AI-powered coding tutor. It is designed to help users strengthe
 ## Tech Stack
 - Langchain agent orchestration
 - SQLite database storage
-- Streamlit prototyping - future
+- Gradio prototyping - UI
 
 *AI was used throuhgout the process, supporting ideation, system design, debugging etc. This was an especially important tool, used with thought, to allow me to navigate through unfamiliar challenges.*
 
@@ -48,6 +48,7 @@ Langchain
 Groq-Langchain
 SQLite - Python docs
 HuggingFace - model information 
+Gradio 
 
 ### Help/research 
 - https://www.youtube.com/watch?v=jsX99U8UkOo - SQLite DB Creation 
@@ -92,6 +93,8 @@ https://stackoverflow.com/questions/4397757/how-can-i-check-to-see-if-my-sqlite-
 https://www.w3schools.com/Python/python_try_except.asp - Try except statement
 
 https://stackoverflow.com/questions/10588317/python-function-global-variables - Global variable manipulation
+
+https://medium.com/@danaasa/building-a-chatbot-with-gradio-a-practical-guide-06986342ef07 - Gradio chatbot
 
 #### Stack overflow questions I posted
 

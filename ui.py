@@ -1,10 +1,15 @@
-import streamlit as st
-import requests
+import gradio as gr
+#import main2
 
-st.header("AI CODING AGENT")
+def decide_action():
+    return "hey"
 
-st.text_area("type in code/concepts", height=300)
+with gr.Blocks() as app:
+    gr.Markdown("## **Python Tutoring AI Agent**")
+    gr.Markdown("Answer questions, get feedback, get stronger!")
 
-st.text_area("response", height=100)
-
-st.button("Submit")
+    gr.Textbox(lines=5, placeholder="Output")
+    gr.Textbox(lines=5, placeholder="Input")
+    submit = gr.Button(value="Submit")
+    
+app.launch()
