@@ -201,7 +201,7 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
         cursor.execute(topicinsert, (None, topic, 0))
         connection.commit()
 
-        return topic, agent_state
+        return topic
         
 
 def generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest):
@@ -241,7 +241,7 @@ def generate_question(agent_state=agent_state, model = model, pydparserquest = p
         agent_state["question_list"].append(question)
         agent_state["Now"]="Waiting for Response"
         agent_state["count_topic_question"] =  agent_state["count_topic_question"] +1
-        return question, agent_state
+        return question
 
 
 
@@ -251,7 +251,7 @@ def get_ans(agent_state=agent_state):
           agent_state["Now"] = 'Providing Feedback'
           agent_state["responses_to_current_q"].append(response)
           agent_state["num_attempts"] = agent_state["num_attempts"] +1
-          return response
+          
 
 def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparserfeed):
     if agent_state["Now"] == 'Providing Feedback':
@@ -326,6 +326,7 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
 
         else:
             agent_state["Now"] = "Waiting for Response" #awaiting another response
+    return output.feedback
 
 setup()
 print("Check 1 \n",agent_state)

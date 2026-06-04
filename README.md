@@ -49,6 +49,7 @@ Groq-Langchain
 SQLite - Python docs
 HuggingFace - model information 
 Gradio 
+Flask
 
 ### Help/research 
 - https://www.youtube.com/watch?v=jsX99U8UkOo - SQLite DB Creation 
@@ -95,6 +96,8 @@ https://www.w3schools.com/Python/python_try_except.asp - Try except statement
 https://stackoverflow.com/questions/10588317/python-function-global-variables - Global variable manipulation
 
 https://medium.com/@danaasa/building-a-chatbot-with-gradio-a-practical-guide-06986342ef07 - Gradio chatbot
+
+https://ihitsuperhuman.medium.com/deploy-your-first-ml-app-using-gradio-1684eec7eb5f - Gradio textbox
 
 #### Stack overflow questions I posted
 
