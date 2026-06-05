@@ -50,6 +50,7 @@ SQLite - Python docs
 HuggingFace - model information 
 Gradio 
 Flask
+Requests
 
 ### Help/research 
 - https://www.youtube.com/watch?v=jsX99U8UkOo - SQLite DB Creation 
@@ -99,6 +100,10 @@ https://medium.com/@danaasa/building-a-chatbot-with-gradio-a-practical-guide-069
 
 https://ihitsuperhuman.medium.com/deploy-your-first-ml-app-using-gradio-1684eec7eb5f - Gradio textbox
 
+https://flask-cors.readthedocs.io/en/latest/ - CORS
+
+https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world - Flask 
+
 #### Stack overflow questions I posted
 
 - https://stackoverflow.com/questions/79907528/why-does-groq-langchain-model-return-tool-use-failed-error/79907609#79907609
@@ -108,3 +113,5 @@ https://ihitsuperhuman.medium.com/deploy-your-first-ml-app-using-gradio-1684eec7
 https://stackoverflow.com/questions/79915713/langchain-agent-state-preservation?r=2
 
 https://ai.stackexchange.com/questions/50494/langchain-agent-state-preservation
+
+https://stackoverflow.com/questions/79951889/flask-backend-and-gradio-ui-error-500-function-missing-1-positional-argument

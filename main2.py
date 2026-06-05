@@ -10,6 +10,7 @@ load_dotenv()
 api = os.getenv("GROQ_API_KEY")
 
 #happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "End of Question" ,"End of Topic"]
+text = ""
 
 agent_state = {
     "topic": None,
@@ -151,7 +152,7 @@ pydparsertopic = PydanticOutputParser(pydantic_object=Topic_structure)
 pydparserquest = PydanticOutputParser(pydantic_object=Question_structure)
 pydparserfeed = PydanticOutputParser(pydantic_object=Feedback_structure)
 
-def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic): 
+def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic, text=text): 
     """
     A function that generates a Topic field based on user input.
 
@@ -164,7 +165,7 @@ def generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsert
         JSON output with one field, "Topic" 
     """
     if (agent_state["Now"]=="Accepting Topic" or agent_state["Now"]=="End of Topic" ) and ( agent_state["count_topic_question"]==0 or agent_state["count_topic_question"]==5 ):
-        firstin = input( "Choose a topic: ")
+        firstin = text
         all_topics_sql = """SELECT Topic FROM TOPICS ORDER BY TopicID"""
         cursor.execute(all_topics_sql)
         list_topics = cursor.fetchall()
@@ -245,9 +246,9 @@ def generate_question(agent_state=agent_state, model = model, pydparserquest = p
 
 
 
-def get_ans(agent_state=agent_state):
+def get_ans(agent_state=agent_state, text=text):
      if agent_state["Now"] == "Waiting for Response":
-          response = input("Enter your answer: ")
+          response = text
           agent_state["Now"] = 'Providing Feedback'
           agent_state["responses_to_current_q"].append(response)
           agent_state["num_attempts"] = agent_state["num_attempts"] +1
@@ -328,14 +329,4 @@ def mark_response(agent_state=agent_state, model = model, pydparserfeed=pydparse
             agent_state["Now"] = "Waiting for Response" #awaiting another response
     return output.feedback
 
-setup()
-print("Check 1 \n",agent_state)
-while True:                 
-    generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic)
-    print("Check 2 \n",agent_state)
-    generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest)
-    print("Check 3 \n",agent_state)
-    get_ans(agent_state=agent_state)
-    print("Check 4 \n",agent_state)
-    mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed)
-    print("Check 5 \n",agent_state)
+

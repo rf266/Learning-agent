@@ -1,13 +1,11 @@
 import gradio as gr
-#import main2
 import requests
-from main2 import setup,mark_response,generate_question,get_ans,generate_topic,api,agent_state,connection, cursor, sql1,sql2,model,Topic_structure,Question_structure,Feedback_structure,pydparserfeed,pydparserquest,pydparsertopic
 
-def submit(text, prev): 
-       # requests.post("/", data=text)
-       ans = requests.post("")
-       new = prev + "\n" + text + "\n" 
-       return  new
+def submission(text, prev): 
+       ans = requests.post("http://127.0.0.1:5000/submit", data={"text":text})
+       ans = ans.text
+       new = prev + "\n" + ans + "\n" 
+       return new
 
 with gr.Blocks() as app:
     gr.Markdown("## **Python Tutoring AI Agent**")
@@ -17,7 +15,7 @@ with gr.Blocks() as app:
     inp = gr.Textbox(lines=5, placeholder="Input")
     submit_b = gr.Button(value="Submit")
     
-    submit_b.click(fn=submit, inputs=[inp, out], outputs=out)
+    submit_b.click(fn=submission, inputs=[inp, out], outputs=out)
     
     
 app.launch()
