@@ -104,6 +104,8 @@ https://flask-cors.readthedocs.io/en/latest/ - CORS
 
 https://blog.miguelgrinberg.com/post/the-flask-mega-tutorial-part-i-hello-world - Flask 
 
+https://www.geeksforgeeks.org/python/python-flask-request-object/ - Flask request object
+
 #### Stack overflow questions I posted
 
 - https://stackoverflow.com/questions/79907528/why-does-groq-langchain-model-return-tool-use-failed-error/79907609#79907609
