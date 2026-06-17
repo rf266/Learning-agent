@@ -1,10 +1,5 @@
-flask
-gradio
-requests
-langchain_core
-langchain_groq
-json
-os
-pydantic
-sqlite3
-dotenv
+gradio==6.15.2
+langchain_core==1.2.22
+langchain_groq==1.1.2
+pydantic==2.12.5
+

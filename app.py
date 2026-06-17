@@ -5,42 +5,11 @@ import sqlite3
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from pydantic import BaseModel, Field
-from langchain_core.output_parsers import PydanticOutputParser
 import gradio as gr
-import requests
 
 load_dotenv() 
 api = os.getenv("GROQ_API_KEY")
-
-class Topic_structure(BaseModel):
-        topic: str = Field(description="Programming topic extracted from user input")
-
-class Question_structure(BaseModel):
-        question: str = Field(description="Programming question extracted from predecided topic")
-
-class Feedback_structure(BaseModel):
-        feedback: str = Field(description="Feedback from user response")
-        correct: int = Field(description="Determines whether the user response is correct (1) or incorrect (0)")
-
-
-pydparsertopic = PydanticOutputParser(pydantic_object=Topic_structure)
-pydparserquest = PydanticOutputParser(pydantic_object=Question_structure)
-pydparserfeed = PydanticOutputParser(pydantic_object=Feedback_structure)
-#happening_now = ["Accepting Topic","Pose Question", "Waiting for Response", "Providing Feedback", "End of Question" ,"End of Topic"]
 text = ""
-
-agent_state = {
-    "topic": None,
-    "topic_understood": 0,
-    "question_list": [], 
-    "count_topic_question": 0,
-    "num_attempts" :0,
-    "correct": 0,
-    "feedback": [],
-    "responses_to_current_q": [],
-    "Now": "Accepting Topic"
-}
 
 connection = sqlite3.connect("learn.db", check_same_thread=False)
 
@@ -64,34 +33,48 @@ sql2 = """create table if not exists QUESTIONS(
 )"""
 model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3, streaming=True)
 
+
 agent_state, message = setup()
 
 def startup():
-    global message
     return message
 
 
 def submission(text, prev): 
+    inputs = text
+    state = agent_state["Now"]
     new = prev + "\n" + text + "\n" 
-    print("Check 1 \n",agent_state)               
-    text = generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic, text=text)
-    new = new + "\n" + text + "\n" 
-    yield "", new
-    print("Check 2 \n",agent_state)
-    text = generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest, text=text)
-    new = new + "\n" + text + "\n" 
-    yield "", new
-    print("Check 3 \n",agent_state)
-    text= get_ans(agent_state=agent_state, text=text)
-    new = new + "\n" + text + "\n" 
-    yield "", new
-    print("Check 4 \n",agent_state)
-    text=mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed,text=text)
-    new = new + "\n" + text + "\n" 
-    yield "", new
-    print("Check 5 \n",agent_state)
-    print(f"gonna send {text} to the box")
-    print(f"Added {text} to the box")
+    print("Check 1 \n",agent_state)
+    if state=="Accepting Topic" or state=="End of Topic":
+        if (agent_state["Now"]=="Accepting Topic" or agent_state["Now"]=="End of Topic" ) and ( agent_state["count_topic_question"]==0 or agent_state["count_topic_question"]==5 ):               
+            text = generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic, text=inputs)
+            new = new + "\n" + text + "\n" 
+            yield "", new
+        print("Check 2 \n",agent_state)
+        if (agent_state["Now"]=="Pose Question" or agent_state["Now"]=="End of Question"  )and len(agent_state["question_list"])<5:
+            text = generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest, text=text)
+            new = new + "\n" + text + "\n" 
+            yield "", new
+        print("Check 3 \n",agent_state)
+    
+    if state=="Waiting for Response":
+        if agent_state["Now"] == "Waiting for Response":
+            text= get_ans(agent_state=agent_state, text=inputs)
+            new = new + "\n" + text + "\n" 
+            yield "", new
+        print("Check 4 \n",agent_state)
+
+        if agent_state["Now"] == 'Providing Feedback':
+            text=mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed,text=text)
+            new = new + "\n" + text + "\n" 
+            yield "", new
+        print("Check 5 \n",agent_state)
+
+        if (agent_state["Now"]=="Pose Question" or agent_state["Now"]=="End of Question"  )and len(agent_state["question_list"])<5:
+            text = generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest, text=text)
+            new = new + "\n" + text + "\n" 
+            yield "", new
+
 
 
 

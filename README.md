@@ -15,7 +15,7 @@ This agent is an AI-powered coding tutor. It is designed to help users strengthe
 ## Functionality
 Each topic is tested with five questions. The user has the chance to choose their own topic, or ask the LLM to suggest one, where the TOPICS table is searched to prevent any repetition. When the user answers the first question, feedback is provided to guide them to the correct answer. In the backend, a new record is created for the particular question, containing the response and feedback provided. When the question is reattempted, the new feedback and response is appended to the text already in the respective cells. 
 
-An AI-suggested state dictionary is used to organise the workflow in the required order. This is updated based on the current stage of the workflow, and is also used as a kind of short term memory for the question and topic, ensuring that details are kept easy to access until the next question is asked. 
+An AI-suggested state dictionary is used to organise the workflow in the required order. This is updated based on the current stage of the workflow, and is also used as a kind of short term memory for the question and topic, ensuring that details are kept easy to access until the next question is asked. Additionally, another specific aspect where AI was used was in coming up with the correct logic for the workflow's progression on the UI - intially, while testing on the CLI, a while loop was used. However, when the submission button was created on the UI, I used AI assistance to help map out the logic for the next steps to be passed based on the current agent state. 
 
 
 ## Significant Decisions in Agent Development

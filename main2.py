@@ -55,7 +55,6 @@ def setup():
         cursor.execute(sql2)     
         print("DB generated")
         message= "Welcome - test out your skills and answer questions to get feedback! Enter your first topic"
-        
         connection.commit() #create the db from scratch
     else: #otherwise populate the state dictionary with the latest record if the tables aren't empty based on cases
         cursor.execute("""SELECT COUNT(*) FROM TOPICS""")
@@ -263,6 +262,7 @@ def get_ans(agent_state=agent_state, text=text):
           agent_state["Now"] = 'Providing Feedback'
           agent_state["responses_to_current_q"].append(response)
           agent_state["num_attempts"] = agent_state["num_attempts"] +1
+          return response
     
      else:
           return text
