@@ -1,5 +1,3 @@
-from flask import Flask, request 
-from flask_cors import CORS
 from main2 import setup,mark_response,generate_question,get_ans,generate_topic,api,agent_state,connection, cursor, sql1,sql2,model,Topic_structure,Question_structure,Feedback_structure,pydparserfeed,pydparserquest,pydparsertopic
 from dotenv import load_dotenv
 import os
@@ -9,6 +7,8 @@ from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 from langchain_core.output_parsers import PydanticOutputParser
+import gradio as gr
+import requests
 
 load_dotenv() 
 api = os.getenv("GROQ_API_KEY")
@@ -64,30 +64,49 @@ sql2 = """create table if not exists QUESTIONS(
 )"""
 model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3, streaming=True)
 
-
-app = Flask(__name__)
-CORS(app=app)
 agent_state, message = setup()
 
-@app.route("/", methods = ["GET"])
 def startup():
     global message
     return message
 
-@app.route("/submit", methods=["POST","GET"])
-def submission():
-   
-    text = request.json.get("text")
-    def gen():
-        nonlocal text
-        print("Check 1 \n",agent_state)               
-        text = generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic, text=text)
-        print("Check 2 \n",agent_state)
-        text = generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest, text=text)
-        print("Check 3 \n",agent_state)
-        text= get_ans(agent_state=agent_state, text=text)
-        print("Check 4 \n",agent_state)
-        text=mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed,text=text)
-        print("Check 5 \n",agent_state)
-        return text
 
+def submission(text, prev): 
+    new = prev + "\n" + text + "\n" 
+    print("Check 1 \n",agent_state)               
+    text = generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic, text=text)
+    new = new + "\n" + text + "\n" 
+    yield "", new
+    print("Check 2 \n",agent_state)
+    text = generate_question(agent_state=agent_state, model = model, pydparserquest = pydparserquest, text=text)
+    new = new + "\n" + text + "\n" 
+    yield "", new
+    print("Check 3 \n",agent_state)
+    text= get_ans(agent_state=agent_state, text=text)
+    new = new + "\n" + text + "\n" 
+    yield "", new
+    print("Check 4 \n",agent_state)
+    text=mark_response(agent_state=agent_state, model = model , pydparserfeed=pydparserfeed,text=text)
+    new = new + "\n" + text + "\n" 
+    yield "", new
+    print("Check 5 \n",agent_state)
+    print(f"gonna send {text} to the box")
+    print(f"Added {text} to the box")
+
+
+
+
+with gr.Blocks() as app:
+    gr.Markdown("## **Python Tutoring AI Agent**")
+    gr.Markdown("Answer questions, get feedback, get stronger!")
+    
+    out = gr.Textbox(lines=5, placeholder="Output", interactive=False)
+    inp = gr.Textbox(lines=1, placeholder="Input")
+    submit_b = gr.Button(value="Submit")
+
+
+    app.load(fn=startup, inputs = None, outputs=out)
+    submit_b.click(fn=submission, inputs=[inp, out], outputs=[inp,out])
+    
+    
+app.launch()
