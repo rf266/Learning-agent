@@ -138,6 +138,7 @@ def setup():
             agent_state["topic_understood"] = first_understood
             agent_state["Now"] = "Pose Question"
             message = f"Welcome to your first topic - {first_topic} - We will proceed from here. "
+            
 
     return agent_state, message
 

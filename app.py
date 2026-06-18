@@ -45,7 +45,7 @@ def submission(text, prev):
     state = agent_state["Now"]
     new = prev + "\n" + text + "\n" 
     print("Check 1 \n",agent_state)
-    if state=="Accepting Topic" or state=="End of Topic":
+    if state=="Accepting Topic" or state=="End of Topic" or state=="Pose Question" or state=="End of Question":
         if (agent_state["Now"]=="Accepting Topic" or agent_state["Now"]=="End of Topic" ) and ( agent_state["count_topic_question"]==0 or agent_state["count_topic_question"]==5 ):               
             text = generate_topic(agent_state=agent_state,model=model,pydparsertopic=pydparsertopic, text=inputs)
             new = new + "\n" + text + "\n" 
@@ -57,7 +57,7 @@ def submission(text, prev):
             yield "", new
         print("Check 3 \n",agent_state)
     
-    if state=="Waiting for Response":
+    if state=="Waiting for Response" or state=="Providing Feedback":
         if agent_state["Now"] == "Waiting for Response":
             text= get_ans(agent_state=agent_state, text=inputs)
             new = new + "\n" + text + "\n" 
