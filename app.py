@@ -40,7 +40,7 @@ def startup():
     global agent_state
     agent_state, message = setup()
     print(message)
-    return message
+    return message, agent_state
 
 
 def submission(text, prev): 
