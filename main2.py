@@ -57,6 +57,14 @@ def setup():
         message= "Welcome - test out your skills and answer questions to get feedback! Enter your first topic"
         connection.commit() #create the db from scratch
     else: #otherwise populate the state dictionary with the latest record if the tables aren't empty based on cases
+        #reset state for railway 
+        agent_state["question_list"].clear()
+        agent_state["count_topic_question"]= 0
+        agent_state["num_attempts"] =0
+        agent_state["correct"]= 0
+        agent_state["feedback"].clear()
+        agent_state["responses_to_current_q"].clear()
+
         cursor.execute("""SELECT COUNT(*) FROM TOPICS""")
         rowstopic = cursor.fetchone()
         cursor.execute("""SELECT COUNT(*) FROM QUESTIONS""")
