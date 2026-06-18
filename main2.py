@@ -120,7 +120,7 @@ def setup():
                 agent_state["feedback"].clear()
                 agent_state["responses_to_current_q"].clear()    
                 agent_state["correct"] = 0
-                message = "Welcome back- Your topic is {first_topic} which is where we left off last time."
+                message = f"Welcome back- Your topic is {first_topic} which is where we left off last time."
 
             elif first_correct == 0: #the previous q was not answered correctly, regardless of the number of questions in the topic
                 print("You tried the previous question ", agent_state["question_list"][-1], " and you were not correct. Try again")

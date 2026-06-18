@@ -37,6 +37,7 @@ model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct",
 agent_state, message = setup()
 
 def startup():
+    print(message)
     return message
 
 
