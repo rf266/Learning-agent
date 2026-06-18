@@ -33,9 +33,6 @@ sql2 = """create table if not exists QUESTIONS(
 )"""
 model = ChatGroq(api_key=api, model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.3, streaming=True)
 
-
-agent_state, message = setup()
-
 def startup():
     global agent_state
     agent_state, message = setup()
