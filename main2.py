@@ -84,6 +84,7 @@ def setup():
                 agent_state["Now"] = "Pose Question"
                 print("no questions found, starting from Q1")
                 message= f"Welcome back - you will be asked questions from the topic of {first_topic} as this is what you entered previously"
+                return agent_state, message
             else:
                 for item in out2:
                     agent_state["question_list"].append(item[0]) #added the questions previously tested to the state
